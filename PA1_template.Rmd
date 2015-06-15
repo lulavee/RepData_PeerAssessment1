@@ -1,25 +1,129 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Peer Assessment 1 —  Activity monitoring data"
+author: "LLCP"
+date: "June 14, 2015"
+output: html_document
 ---
-
 
 ## Loading and preprocessing the data
 
+The data has been preprocess using dplyr library, dplyr provides a flexible grammar of data manipulation
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+data <- read.csv(file = "activity.csv", as.is = TRUE)
+data <- tbl_df(data)
+```
 
 
 ## What is mean total number of steps taken per day?
 
+First, I calculate the total number of steps group by day
 
+```{r, warning=FALSE, message=FALSE}
+data_question_1 <- data %>% 
+                         group_by(date) %>%
+                         summarise(stepsByDay= sum(steps, na.rm = T))
+
+```
+
+Then, I plot the histogram for the **data_question_1** already compute: 
+
+```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
+qplot(stepsByDay, data=data_question_1, geom= "histogram")
+```
+
+Finally, I calculate and report the mean and median of the total number of steps taken per day: 
+
+```{r, warning=FALSE, message=FALSE}
+mean(data_question_1$stepsByDay)
+median(data_question_1$stepsByDay)
+```
 
 ## What is the average daily activity pattern?
 
+First, I calculate the mean number of steps group by interval
 
+```{r, warning=FALSE, message=FALSE}
+data_question_2 <- data %>% 
+                         group_by(interval) %>%
+                         summarise(stepsByInterval= mean(steps, na.rm = T))
+
+```
+
+Then, I plot the 5-minute interval average number of steps taken, to show the daily pattern:
+
+```{r, warning=FALSE, message=FALSE}
+qplot(interval, stepsByInterval, data=data_question_2, geom=c("point", "smooth"))
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps? 
+
+```{r, warning=FALSE, message=FALSE}
+data_question_2 %>% filter( stepsByInterval == max(stepsByInterval))
+
+```
 
 ## Imputing missing values
 
+The presence of missing days may introduce bias into some calculations or summaries of the data. I will calculate and report the total number of missing values in the dataset
 
+```{r, warning=FALSE, message=FALSE}
+sum(is.na(data$steps))
+```
+
+The strategy for filling the missing values in the dataset is filling that value with the mean for that 5-minute interval. Let's do it! I already have the mean 5-minute interval in the **data_question_2** dataset     
+
+```{r, warning=FALSE, message=TRUE}
+data_question_3 <- left_join(data, data_question_2) %>%
+                  mutate(fill.steps = ifelse(is.na(steps), stepsByInterval, steps)) %>%
+                  select(date, interval, fill.steps)
+```
+
+I will make a histogram of the total number of steps taken each day 
+
+```{r, warning=FALSE, message=FALSE}
+qplot(fill.steps, data=data_question_3, geom= "histogram")
+```
+
+Now, I calculate and report the mean and median total number of steps taken per day.
+
+```{r, warning=FALSE, message=FALSE}
+mean(data_question_3$fill.steps)
+median(data_question_3$fill.steps)
+```
+
+Do these values differ from the estimates from the first part of the assignment? Sure, lets look how much they differ
+
+```{r, warning=FALSE, message=FALSE}
+mean(data_question_1$stepsByDay) - mean(data_question_3$fill.steps)
+median(data_question_1$stepsByDay) - median(data_question_3$fill.steps)
+```
+
+**What is the impact of imputing missing data on the estimates of the total daily number of steps? 
+The impact is huge! Now, this guys looks like a very sedentary man.**
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+I create a new variable in the dataset with two values – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r, warning=FALSE, message=FALSE}
+data_question_4 <- data %>% mutate(day =weekdays(as.Date(data$date))) %>%
+                  mutate(weekday = ifelse((day == "Sunday" | day == "Saturday"),"weekend", "weekday")) 
+
+data_question_4 <- data_question_4 %>% 
+                  select(steps, date, interval, weekday) %>%
+                  group_by(weekday, interval) %>%
+                  summarise(stepsByInterval= mean(steps, na.rm = T))
+
+
+```
+
+Let's see if there is any difference in the between weekday and weekend
+
+```{r, warning=FALSE, message=FALSE}
+qplot(interval, stepsByInterval,
+      data=data_question_4, facets=.~weekday,
+      geom=c("point","smooth"), color=weekday)
+```
